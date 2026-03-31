@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  permissions String[]
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model Department {
+  id        String       @id @default(cuid())
+  code      String       @unique
+  name      String
+  parentId  String?
+  parent    Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children  Department[] @relation("DepartmentHierarchy")
+  managerId String?
+  manager   User?        @relation("DepartmentManager", fields: [managerId], references: [id])
+  users     User[]       @relation("DepartmentUsers")
+  isActive  Boolean      @default(true)
+  deletedAt DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@map("departments")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  passwordHash   String
+  name           String
+  nameKana       String?
+  employeeCode   String    @unique
+  avatarUrl      String?
+  phone          String?
+  isActive       Boolean   @default(true)
+  deletedAt      DateTime?
+  departmentId   String?
+  department     Department? @relation("DepartmentUsers", fields: [departmentId], references: [id])
+  roleId         String
+  role           Role       @relation(fields: [roleId], references: [id])
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  managedDepartments Department[] @relation("DepartmentManager")
+  loginHistory       LoginHistory[]
+  auditLogs          AuditLog[]
+  refreshTokens      RefreshToken[]
+  approvalRequests   ApprovalRequest[] @relation("RequesterApprovals")
+  approvalDecisions  ApprovalRequest[] @relation("ApproverApprovals")
+
+  @@map("users")
+}
+
+model LoginHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  ipAddress  String?
+  userAgent  String?
+  success    Boolean
+  failReason String?
+  createdAt  DateTime @default(now())
+
+  @@map("login_history")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  resource   String
+  resourceId String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model ApprovalRequest {
+  id          String    @id @default(cuid())
+  requesterId String
+  requester   User      @relation("RequesterApprovals", fields: [requesterId], references: [id])
+  approverId  String?
+  approver    User?     @relation("ApproverApprovals", fields: [approverId], references: [id])
+  type        String
+  title       String
+  description String?
+  status      String    @default("PENDING")
+  startDate   DateTime?
+  endDate     DateTime?
+  amount      Float?
+  fileUrl     String?
+  comment     String?
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("approval_requests")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
