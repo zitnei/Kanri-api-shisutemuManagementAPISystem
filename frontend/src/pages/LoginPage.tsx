@@ -53,15 +53,14 @@ export function LoginPage() {
         {/* Brand copy — centered */}
         <div className="flex-1 flex flex-col items-center justify-center text-center">
           <blockquote
-            className="text-3xl leading-snug tracking-[-0.02em] text-[#f4f4f5] mb-6"
+            className="text-3xl leading-snug tracking-[-0.06em] text-[#f4f4f5] mb-6"
             style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
           >
-            "組織のガバナンスを、<br />
-            シンプルに。"
+            "チームの管理業務を、<br />
+            一か所にまとめる。"
           </blockquote>
           <p className="text-sm text-[#52525b] leading-relaxed max-w-xs">
-            ユーザー管理、承認フロー、監査ログ。
-            エンタープライズに必要なすべてを一つのプラットフォームで。
+            ユーザー管理・申請承認・操作履歴を統合。面倒な管理作業をまとめて解決します。
           </p>
         </div>
 
