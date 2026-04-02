@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authLimiter } from '../../middleware/rateLimiter';
 import {
+  registerHandler,
   loginHandler,
   refreshHandler,
   logoutHandler,
@@ -37,6 +38,7 @@ const router = Router();
  *       401:
  *         description: Invalid credentials
  */
+router.post('/register', authLimiter, registerHandler);
 router.post('/login', authLimiter, loginHandler);
 
 /**

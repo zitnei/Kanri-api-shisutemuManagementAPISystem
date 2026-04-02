@@ -65,6 +65,38 @@ function generateRefreshToken(): string {
   return crypto.randomBytes(64).toString('hex');
 }
 
+export async function register(
+  name: string,
+  email: string,
+  password: string
+): Promise<{ id: string; email: string; name: string }> {
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    throw new AppError(409, 'EMAIL_ALREADY_EXISTS', 'このメールアドレスはすでに登録されています');
+  }
+
+  const employeeRole = await prisma.role.findUnique({ where: { name: 'employee' } });
+  if (!employeeRole) {
+    throw new AppError(500, 'ROLE_NOT_FOUND', 'Default role not found. Please run db:seed first.');
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const employeeCode = `EMP-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      passwordHash,
+      employeeCode,
+      roleId: employeeRole.id,
+    },
+  });
+
+  logger.info(`New user registered: ${email}`);
+  return { id: user.id, email: user.email, name: user.name };
+}
+
 export async function login(
   email: string,
   password: string,

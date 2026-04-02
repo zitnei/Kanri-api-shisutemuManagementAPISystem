@@ -1,8 +1,14 @@
 import { Request, Response } from 'express';
 import * as authService from './auth.service';
-import { loginSchema, refreshTokenSchema, logoutSchema } from './auth.schema';
+import { loginSchema, refreshTokenSchema, logoutSchema, registerSchema } from './auth.schema';
 import { sendSuccess, sendNoContent } from '../../utils/response';
 import { asyncHandler } from '../../utils/asyncHandler';
+
+export const registerHandler = asyncHandler(async (req: Request, res: Response) => {
+  const body = registerSchema.parse(req.body);
+  const user = await authService.register(body.name, body.email, body.password);
+  res.status(201).json({ success: true, data: user });
+});
 
 export const loginHandler = asyncHandler(async (req: Request, res: Response) => {
   const body = loginSchema.parse(req.body);
