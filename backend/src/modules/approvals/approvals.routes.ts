@@ -10,6 +10,7 @@ import {
   rejectRequest,
   cancelRequest,
   getStatusSummary,
+  bulkApproveHandler,
 } from './approvals.controller';
 
 const router = Router();
@@ -40,6 +41,7 @@ router.get('/:id', authorize('approvals:read'), getApproval);
  *       201:
  *         description: Approval request created
  */
+router.post('/bulk-approve', authorize('approvals:approve'), auditMiddleware, bulkApproveHandler);
 router.post('/', authorize('approvals:write'), auditMiddleware, createApproval);
 router.post('/:id/approve', authorize('approvals:approve'), auditMiddleware, approveRequest);
 router.post('/:id/reject', authorize('approvals:approve'), auditMiddleware, rejectRequest);

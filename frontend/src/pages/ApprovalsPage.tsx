@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/Input';
 import { ApprovalStatusBadge, Badge } from '../components/ui/Badge';
@@ -7,7 +7,7 @@ import { Pagination } from '../components/ui/Pagination';
 import { usePagination } from '../hooks/usePagination';
 import { useAuth } from '../hooks/useAuth';
 import * as approvalsApi from '../api/approvals';
-import type { ApprovalRequest, ApprovalStatus } from '../types';
+import type { ApprovalRequest, ApprovalStatus, ApprovalType } from '../types';
 import { AxiosError } from 'axios';
 
 const STATUS_TABS: Array<{ key: '' | ApprovalStatus; label: string }> = [
@@ -31,7 +31,14 @@ export function ApprovalsPage() {
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'' | ApprovalStatus>('');
+  const [typeFilter, setTypeFilter] = useState<'' | ApprovalType>('');
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const [reviewingApproval, setReviewingApproval] = useState<{
     approval: ApprovalRequest;
     action: 'approve' | 'reject';
@@ -49,11 +56,15 @@ export function ApprovalsPage() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
 
-  async function loadApprovals(page: number) {
+  async function loadApprovals(page: number, searchVal = search) {
     setLoading(true);
     try {
       const result = await approvalsApi.listApprovals({
         status: activeTab || undefined,
+        type: typeFilter || undefined,
+        search: searchVal || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
         page,
         limit: pagination.limit,
       });
@@ -66,12 +77,64 @@ export function ApprovalsPage() {
 
   useEffect(() => {
     loadApprovals(pagination.page);
-  }, [pagination.page, activeTab]);
+  }, [pagination.page, activeTab, typeFilter, dateFrom, dateTo]);
+
+  useEffect(() => {
+    clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      pagination.reset();
+      loadApprovals(1, search);
+    }, 300);
+    return () => clearTimeout(searchTimerRef.current);
+  }, [search]);
 
   function handleTabChange(tab: '' | ApprovalStatus) {
     setActiveTab(tab);
+    setSelectedIds(new Set());
     pagination.reset();
   }
+
+  function resetFilters() {
+    setSearch('');
+    setTypeFilter('');
+    setDateFrom('');
+    setDateTo('');
+    setSelectedIds(new Set());
+    pagination.reset();
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const pendingIds = approvals.filter((a) => a.status === 'PENDING').map((a) => a.id);
+    if (pendingIds.every((id) => selectedIds.has(id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingIds));
+    }
+  }
+
+  async function handleBulkApprove() {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      await approvalsApi.bulkApprove(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      await loadApprovals(pagination.page);
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  const activeFilterCount = [search, typeFilter, dateFrom, dateTo].filter(Boolean).length;
+  const pendingApprovals = approvals.filter((a) => a.status === 'PENDING');
+  const allPendingSelected = pendingApprovals.length > 0 && pendingApprovals.every((a) => selectedIds.has(a.id));
 
   async function handleApprove() {
     if (!reviewingApproval) return;
@@ -133,21 +196,98 @@ export function ApprovalsPage() {
         )}
       </div>
 
-      {/* Status tabs */}
-      <div className="flex gap-1 bg-[#1a1d27] border border-white/[0.08] rounded-xl p-1 w-fit">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => handleTabChange(tab.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeTab === tab.key
-                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg'
-                : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.05]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Status tabs + filters */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-1 bg-[#1a1d27] border border-white/[0.08] rounded-xl p-1">
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => handleTabChange(tab.key)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === tab.key
+                    ? 'bg-white/10 text-white'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.05]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {canApprove && selectedIds.size > 0 && (
+            <button
+              onClick={handleBulkApprove}
+              disabled={bulkLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+            >
+              {bulkLoading ? '処理中...' : `選択した${selectedIds.size}件を一括承認`}
+            </button>
+          )}
+        </div>
+
+        {/* Search & filter bar */}
+        <div className="bg-[#1a1d27] border border-white/[0.08] rounded-xl p-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-48">
+              <Input
+                placeholder="タイトル・申請者名で検索..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                leftIcon={
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                }
+              />
+            </div>
+            <div className="w-36">
+              <Select
+                value={typeFilter}
+                onChange={(e) => { setTypeFilter(e.target.value as '' | ApprovalType); pagination.reset(); }}
+                options={[
+                  { value: '', label: 'すべての種別' },
+                  { value: 'VACATION', label: '年次有給' },
+                  { value: 'EXPENSE', label: '経費精算' },
+                  { value: 'OVERTIME', label: '残業申請' },
+                  { value: 'OTHER', label: 'その他' },
+                ]}
+              />
+            </div>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => { setDateFrom(e.target.value); pagination.reset(); }}
+              label="開始日"
+            />
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => { setDateTo(e.target.value); pagination.reset(); }}
+              label="終了日"
+            />
+            {activeFilterCount > 0 && (
+              <button
+                onClick={resetFilters}
+                className="flex items-center gap-1.5 text-xs text-[#a1a1aa] hover:text-[#f4f4f5] border border-white/[0.08] rounded px-3 py-2 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                リセット
+                <span className="bg-white/10 text-[#f4f4f5] text-xs rounded-full px-1.5">{activeFilterCount}</span>
+              </button>
+            )}
+            {canApprove && pendingApprovals.length > 0 && (
+              <button
+                onClick={toggleSelectAll}
+                className="flex items-center gap-1.5 text-xs text-[#a1a1aa] hover:text-[#f4f4f5] border border-white/[0.08] rounded px-3 py-2 transition-colors"
+              >
+                <div className={`w-3.5 h-3.5 border rounded flex items-center justify-center ${allPendingSelected ? 'bg-emerald-500 border-emerald-500' : 'border-white/30'}`}>
+                  {allPendingSelected && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                </div>
+                承認待ちを全選択
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Approvals grid */}
@@ -175,6 +315,14 @@ export function ApprovalsPage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
+                    {canApprove && approval.status === 'PENDING' && (
+                      <button
+                        onClick={() => toggleSelect(approval.id)}
+                        className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${selectedIds.has(approval.id) ? 'bg-emerald-500 border-emerald-500' : 'border-white/30 hover:border-white/50'}`}
+                      >
+                        {selectedIds.has(approval.id) && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                      </button>
+                    )}
                     <Badge variant="indigo" size="sm">{TYPE_LABELS[approval.type] || approval.type}</Badge>
                     <ApprovalStatusBadge status={approval.status} />
                   </div>

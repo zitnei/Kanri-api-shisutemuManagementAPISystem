@@ -5,10 +5,13 @@ export interface ListUsersParams {
   search?: string;
   departmentId?: string;
   roleId?: string;
+  roleName?: string;
   isActive?: boolean;
   cursor?: string;
   limit?: number;
   page?: number;
+  sortBy?: 'createdAt' | 'name' | 'employeeCode';
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface CreateUserData {
@@ -41,9 +44,12 @@ export async function listUsers(params: ListUsersParams = {}): Promise<{
   if (params.search) query.set('search', params.search);
   if (params.departmentId) query.set('departmentId', params.departmentId);
   if (params.roleId) query.set('roleId', params.roleId);
+  if (params.roleName) query.set('roleName', params.roleName);
   if (params.isActive !== undefined) query.set('isActive', String(params.isActive));
   if (params.cursor) query.set('cursor', params.cursor);
   if (params.limit) query.set('limit', String(params.limit));
+  if (params.sortBy) query.set('sortBy', params.sortBy);
+  if (params.sortOrder) query.set('sortOrder', params.sortOrder);
 
   const response = await apiClient.get<ApiResponse<User[]>>(`/users?${query.toString()}`);
   return {
@@ -82,6 +88,22 @@ export async function exportUsersCsv(params: ListUsersParams = {}): Promise<Blob
     responseType: 'blob',
   });
   return response.data;
+}
+
+export async function forceLogoutUser(id: string): Promise<void> {
+  await apiClient.post(`/users/${id}/force-logout`);
+}
+
+export async function getUserLoginHistory(id: string): Promise<Array<{
+  id: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  success: boolean;
+  failReason: string | null;
+  createdAt: string;
+}>> {
+  const response = await apiClient.get(`/users/${id}/login-history`);
+  return response.data.data || [];
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {

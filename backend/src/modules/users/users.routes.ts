@@ -12,6 +12,8 @@ import {
   changePasswordHandler,
   exportCsvHandler,
   getDashboardStats,
+  forceLogoutUser,
+  getUserLoginHistory,
 } from './users.controller';
 
 const router = Router();
@@ -165,5 +167,7 @@ router.delete('/:id', authorize('users:delete'), auditMiddleware, deleteUser);
  *         description: Password changed
  */
 router.post('/me/change-password', changePasswordHandler);
+router.post('/:id/force-logout', authorize('users:write'), forceLogoutUser);
+router.get('/:id/login-history', authorize('users:read'), getUserLoginHistory);
 
 export default router;

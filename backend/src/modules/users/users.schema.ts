@@ -27,10 +27,13 @@ export const listUsersQuerySchema = z.object({
   search: z.string().optional(),
   departmentId: z.string().optional(),
   roleId: z.string().optional(),
+  roleName: z.enum(['admin', 'manager', 'employee']).optional(),
   isActive: z.enum(['true', 'false']).optional(),
   cursor: z.string().optional(),
   limit: z.string().transform(Number).default('20'),
   page: z.string().transform(Number).default('1'),
+  sortBy: z.enum(['createdAt', 'name', 'employeeCode']).default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
 export const changePasswordSchema = z.object({

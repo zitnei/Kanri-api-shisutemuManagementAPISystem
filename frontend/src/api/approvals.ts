@@ -15,6 +15,9 @@ export interface CreateApprovalData {
 export interface ListApprovalsParams {
   status?: ApprovalStatus;
   type?: ApprovalType;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   limit?: number;
 }
@@ -28,6 +31,9 @@ export async function listApprovals(params: ListApprovalsParams = {}): Promise<{
   const query = new URLSearchParams();
   if (params.status) query.set('status', params.status);
   if (params.type) query.set('type', params.type);
+  if (params.search) query.set('search', params.search);
+  if (params.dateFrom) query.set('dateFrom', params.dateFrom);
+  if (params.dateTo) query.set('dateTo', params.dateTo);
   if (params.page) query.set('page', String(params.page));
   if (params.limit) query.set('limit', String(params.limit));
 
@@ -70,6 +76,11 @@ export async function rejectRequest(id: string, comment?: string): Promise<Appro
 
 export async function cancelRequest(id: string): Promise<void> {
   await apiClient.delete(`/approvals/${id}`);
+}
+
+export async function bulkApprove(ids: string[], comment?: string): Promise<{ succeeded: number; failed: number; total: number }> {
+  const response = await apiClient.post('/approvals/bulk-approve', { ids, comment });
+  return response.data.data;
 }
 
 export async function getStatusSummary(): Promise<Record<string, number>> {

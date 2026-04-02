@@ -12,24 +12,27 @@ export function DashboardPage() {
   const [recentLogs, setRecentLogs] = useState<AuditLog[]>([]);
   const [approvalSummary, setApprovalSummary] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [statsData, logsData, summaryData] = await Promise.allSettled([
+        getDashboardStats(),
+        getRecentActivity(10),
+        getStatusSummary(),
+      ]);
+
+      if (statsData.status === 'fulfilled') setStats(statsData.value);
+      if (logsData.status === 'fulfilled') setRecentLogs(logsData.value);
+      if (summaryData.status === 'fulfilled') setApprovalSummary(summaryData.value);
+      setLastUpdated(new Date());
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [statsData, logsData, summaryData] = await Promise.allSettled([
-          getDashboardStats(),
-          getRecentActivity(10),
-          getStatusSummary(),
-        ]);
-
-        if (statsData.status === 'fulfilled') setStats(statsData.value);
-        if (logsData.status === 'fulfilled') setRecentLogs(logsData.value);
-        if (summaryData.status === 'fulfilled') setApprovalSummary(summaryData.value);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadData();
   }, []);
 
@@ -84,9 +87,23 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div>
-        <h2 className="text-2xl font-bold text-white">ダッシュボード</h2>
-        <p className="text-slate-500 text-sm mt-1">システムの概要と最近のアクティビティ</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">ダッシュボード</h2>
+          <p className="text-slate-500 text-sm mt-1">
+            {lastUpdated ? `最終更新: ${lastUpdated.toLocaleTimeString('ja-JP')}` : 'システムの概要と最近のアクティビティ'}
+          </p>
+        </div>
+        <button
+          onClick={loadData}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 text-sm text-[#a1a1aa] hover:text-[#f4f4f5] border border-white/[0.08] rounded-lg hover:border-white/[0.16] transition-all disabled:opacity-40"
+        >
+          <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          更新
+        </button>
       </div>
 
       {/* Stats grid */}

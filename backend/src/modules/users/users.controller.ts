@@ -11,9 +11,12 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
     search: query.search,
     departmentId: query.departmentId,
     roleId: query.roleId,
+    roleName: query.roleName,
     isActive: query.isActive !== undefined ? query.isActive === 'true' : undefined,
     cursor: query.cursor,
     limit: query.limit,
+    sortBy: query.sortBy,
+    sortOrder: query.sortOrder,
   });
 
   sendSuccess(res, result.items, 200, {
@@ -63,6 +66,16 @@ export const exportCsvHandler = asyncHandler(async (req: Request, res: Response)
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="users_${Date.now()}.csv"`);
   res.send(csv);
+});
+
+export const forceLogoutUser = asyncHandler(async (req: Request, res: Response) => {
+  await usersService.forceLogout(req.params.id);
+  sendNoContent(res);
+});
+
+export const getUserLoginHistory = asyncHandler(async (req: Request, res: Response) => {
+  const history = await usersService.getLoginHistory(req.params.id);
+  sendSuccess(res, history);
 });
 
 export const getDashboardStats = asyncHandler(async (req: Request, res: Response) => {

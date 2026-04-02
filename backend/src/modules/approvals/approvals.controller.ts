@@ -22,8 +22,16 @@ const reviewSchema = z.object({
 const listQuerySchema = z.object({
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
   type: z.enum(['VACATION', 'EXPENSE', 'OVERTIME', 'OTHER']).optional(),
+  search: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
   page: z.string().transform(Number).default('1'),
   limit: z.string().transform(Number).default('20'),
+});
+
+const bulkApproveSchema = z.object({
+  ids: z.array(z.string()).min(1),
+  comment: z.string().max(1000).optional(),
 });
 
 export const listApprovals = asyncHandler(async (req: Request, res: Response) => {
@@ -31,6 +39,9 @@ export const listApprovals = asyncHandler(async (req: Request, res: Response) =>
   const result = await approvalsService.findMany({
     status: query.status,
     type: query.type,
+    search: query.search,
+    dateFrom: query.dateFrom,
+    dateTo: query.dateTo,
     userId: req.user!.sub,
     userRole: req.user!.role,
     page: query.page,
@@ -73,6 +84,12 @@ export const rejectRequest = asyncHandler(async (req: Request, res: Response) =>
 export const cancelRequest = asyncHandler(async (req: Request, res: Response) => {
   await approvalsService.cancel(req.params.id, req.user!.sub);
   sendNoContent(res);
+});
+
+export const bulkApproveHandler = asyncHandler(async (req: Request, res: Response) => {
+  const body = bulkApproveSchema.parse(req.body);
+  const result = await approvalsService.bulkApprove(body.ids, req.user!.sub, body.comment);
+  sendSuccess(res, result);
 });
 
 export const getStatusSummary = asyncHandler(async (_req: Request, res: Response) => {

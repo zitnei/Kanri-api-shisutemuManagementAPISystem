@@ -31,6 +31,9 @@ export type ApprovalType = 'VACATION' | 'EXPENSE' | 'OVERTIME' | 'OTHER';
 export async function findMany(params: {
   status?: ApprovalStatus;
   type?: ApprovalType;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
   requesterId?: string;
   approverId?: string;
   userId?: string;
@@ -46,6 +49,19 @@ export async function findMany(params: {
     ...(params.type ? { type: params.type } : {}),
     ...(params.requesterId ? { requesterId: params.requesterId } : {}),
     ...(params.approverId ? { approverId: params.approverId } : {}),
+    ...(params.search ? {
+      OR: [
+        { title: { contains: params.search, mode: 'insensitive' } },
+        { description: { contains: params.search, mode: 'insensitive' } },
+        { requester: { name: { contains: params.search, mode: 'insensitive' } } },
+      ],
+    } : {}),
+    ...(params.dateFrom || params.dateTo ? {
+      createdAt: {
+        ...(params.dateFrom ? { gte: new Date(params.dateFrom) } : {}),
+        ...(params.dateTo ? { lte: new Date(params.dateTo + 'T23:59:59.999Z') } : {}),
+      },
+    } : {}),
   };
 
   // Non-admins/managers can only see their own requests
@@ -174,6 +190,15 @@ export async function cancel(id: string, requesterId: string) {
   }
 
   await prisma.approvalRequest.delete({ where: { id } });
+}
+
+export async function bulkApprove(ids: string[], approverId: string, comment?: string) {
+  const results = await Promise.allSettled(
+    ids.map((id) => approve(id, approverId, comment))
+  );
+  const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  return { succeeded, failed, total: ids.length };
 }
 
 export async function getStatusSummary() {

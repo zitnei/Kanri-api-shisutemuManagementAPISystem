@@ -135,6 +135,15 @@ export function AuditLogsPage() {
               label="終了日"
             />
           </div>
+          {(search || resourceFilter || actionFilter || dateFrom || dateTo) && (
+            <button
+              onClick={() => { setSearch(''); setResourceFilter(''); setActionFilter(''); setDateFrom(''); setDateTo(''); pagination.reset(); }}
+              className="flex items-center gap-1.5 text-xs text-[#a1a1aa] hover:text-[#f4f4f5] border border-white/[0.08] rounded px-3 py-2 transition-colors self-end mb-0.5"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              リセット
+            </button>
+          )}
         </div>
       </div>
 

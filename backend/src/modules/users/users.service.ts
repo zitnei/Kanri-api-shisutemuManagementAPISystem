@@ -31,17 +31,23 @@ export async function findMany(params: {
   search?: string;
   departmentId?: string;
   roleId?: string;
+  roleName?: string;
   isActive?: boolean;
   cursor?: string;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }) {
   const limit = Math.min(params.limit || 20, 100);
+  const sortOrder = params.sortOrder || 'desc';
+  const sortBy = params.sortBy || 'createdAt';
 
   const where: Prisma.UserWhereInput = {
     deletedAt: null,
     ...(params.isActive !== undefined ? { isActive: params.isActive } : {}),
     ...(params.departmentId ? { departmentId: params.departmentId } : {}),
     ...(params.roleId ? { roleId: params.roleId } : {}),
+    ...(params.roleName ? { role: { name: params.roleName } } : {}),
     ...(params.search
       ? {
           OR: [
@@ -54,17 +60,34 @@ export async function findMany(params: {
       : {}),
   };
 
+  const orderBy: Prisma.UserOrderByWithRelationInput =
+    sortBy === 'name' ? { name: sortOrder } :
+    sortBy === 'employeeCode' ? { employeeCode: sortOrder } :
+    { createdAt: sortOrder };
+
   const [total, items] = await Promise.all([
     prisma.user.count({ where }),
     prisma.user.findMany({
       where,
       select: USER_SELECT,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       ...buildCursorQuery({ cursor: params.cursor, limit }),
     }),
   ]);
 
   return buildCursorResult(items, limit, total);
+}
+
+export async function forceLogout(userId: string) {
+  await prisma.refreshToken.deleteMany({ where: { userId } });
+}
+
+export async function getLoginHistory(userId: string, limit = 20) {
+  return prisma.loginHistory.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
 }
 
 export async function findById(id: string) {

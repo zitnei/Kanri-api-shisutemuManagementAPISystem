@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Table } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/Input';
@@ -9,7 +9,6 @@ import { usePagination } from '../hooks/usePagination';
 import { useAuth } from '../hooks/useAuth';
 import * as usersApi from '../api/users';
 import * as departmentsApi from '../api/departments';
-import * as rolesApi from '../api/auth';
 import type { User, Department } from '../types';
 import { AxiosError } from 'axios';
 
@@ -53,7 +52,13 @@ export function UsersPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
-  const [roles, setRoles] = useState<Array<{ id: string; name: string; displayName: string }>>([]);
+  const [sortBy, setSortBy] = useState<'createdAt' | 'name' | 'employeeCode'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [forceLogoutUser, setForceLogoutUser] = useState<User | null>(null);
+  const [forceLogoutLoading, setForceLogoutLoading] = useState(false);
+  const [loginHistoryUser, setLoginHistoryUser] = useState<User | null>(null);
+  const [loginHistory, setLoginHistory] = useState<Array<{ id: string; ipAddress: string | null; userAgent: string | null; success: boolean; failReason: string | null; createdAt: string }>>([]);
+  const [loginHistoryLoading, setLoginHistoryLoading] = useState(false);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -64,9 +69,12 @@ export function UsersPage() {
         usersApi.listUsers({
           search: searchVal || undefined,
           departmentId: deptFilter || undefined,
+          roleName: roleFilter as 'admin' | 'manager' | 'employee' | undefined || undefined,
           isActive: statusFilter === 'true' ? true : statusFilter === 'false' ? false : undefined,
           page,
           limit: pagination.limit,
+          sortBy,
+          sortOrder,
         }),
         departmentsApi.listDepartments(),
       ]);
@@ -81,7 +89,7 @@ export function UsersPage() {
 
   useEffect(() => {
     loadData(search, pagination.page);
-  }, [pagination.page, deptFilter, roleFilter, statusFilter]);
+  }, [pagination.page, deptFilter, roleFilter, statusFilter, sortBy, sortOrder]);
 
   // Debounced search
   useEffect(() => {
@@ -182,6 +190,41 @@ export function UsersPage() {
     }
   }
 
+  function resetFilters() {
+    setSearch('');
+    setDeptFilter('');
+    setRoleFilter('');
+    setStatusFilter('');
+    setSortBy('createdAt');
+    setSortOrder('desc');
+    pagination.reset();
+  }
+
+  const activeFilterCount = [search, deptFilter, roleFilter, statusFilter].filter(Boolean).length;
+
+  async function handleForceLogout() {
+    if (!forceLogoutUser) return;
+    setForceLogoutLoading(true);
+    try {
+      await usersApi.forceLogoutUser(forceLogoutUser.id);
+      setForceLogoutUser(null);
+    } finally {
+      setForceLogoutLoading(false);
+    }
+  }
+
+  async function openLoginHistory(user: User) {
+    setLoginHistoryUser(user);
+    setLoginHistoryLoading(true);
+    setLoginHistory([]);
+    try {
+      const history = await usersApi.getUserLoginHistory(user.id);
+      setLoginHistory(history);
+    } finally {
+      setLoginHistoryLoading(false);
+    }
+  }
+
   async function handleExportCsv() {
     setExportLoading(true);
     try {
@@ -271,16 +314,20 @@ export function UsersPage() {
       header: '操作',
       align: 'right' as const,
       render: (user: User) => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="sm" onClick={() => openLoginHistory(user)} title="ログイン履歴">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </Button>
           {hasPermission('users:write') && (
-            <Button variant="ghost" size="sm" onClick={() => openEdit(user)}>
-              編集
-            </Button>
+            <>
+              <Button variant="ghost" size="sm" onClick={() => openEdit(user)}>編集</Button>
+              <Button variant="ghost" size="sm" onClick={() => setForceLogoutUser(user)} className="text-amber-400 hover:text-amber-300" title="強制ログアウト">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              </Button>
+            </>
           )}
           {hasPermission('users:delete') && (
-            <Button variant="ghost" size="sm" onClick={() => setDeletingUser(user)} className="text-red-400 hover:text-red-300">
-              削除
-            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setDeletingUser(user)} className="text-red-400 hover:text-red-300">削除</Button>
           )}
         </div>
       ),
@@ -398,18 +445,20 @@ export function UsersPage() {
               }
             />
           </div>
-          <div className="w-44">
-            <Select
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              options={deptOptions}
-              placeholder="すべての部署"
-            />
+          <div className="w-40">
+            <Select value={deptFilter} onChange={(e) => { setDeptFilter(e.target.value); pagination.reset(); }} options={deptOptions} />
           </div>
           <div className="w-36">
             <Select
+              value={roleFilter}
+              onChange={(e) => { setRoleFilter(e.target.value); pagination.reset(); }}
+              options={ROLE_OPTIONS}
+            />
+          </div>
+          <div className="w-32">
+            <Select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => { setStatusFilter(e.target.value); pagination.reset(); }}
               options={[
                 { value: '', label: '全ステータス' },
                 { value: 'true', label: '有効のみ' },
@@ -417,6 +466,32 @@ export function UsersPage() {
               ]}
             />
           </div>
+          <div className="w-36">
+            <Select
+              value={`${sortBy}-${sortOrder}`}
+              onChange={(e) => {
+                const [by, order] = e.target.value.split('-') as ['createdAt' | 'name' | 'employeeCode', 'asc' | 'desc'];
+                setSortBy(by); setSortOrder(order); pagination.reset();
+              }}
+              options={[
+                { value: 'createdAt-desc', label: '登録日（新しい順）' },
+                { value: 'createdAt-asc', label: '登録日（古い順）' },
+                { value: 'name-asc', label: '氏名（昇順）' },
+                { value: 'name-desc', label: '氏名（降順）' },
+                { value: 'employeeCode-asc', label: '社員コード（昇順）' },
+              ]}
+            />
+          </div>
+          {activeFilterCount > 0 && (
+            <button
+              onClick={resetFilters}
+              className="flex items-center gap-1.5 text-xs text-[#a1a1aa] hover:text-[#f4f4f5] border border-white/[0.08] rounded px-3 py-2 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              リセット
+              <span className="bg-white/10 text-[#f4f4f5] text-xs rounded-full px-1.5">{activeFilterCount}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -485,6 +560,49 @@ export function UsersPage() {
         confirmLabel="削除する"
         loading={deleteLoading}
       />
+
+      {/* Force Logout Confirm */}
+      <ConfirmModal
+        isOpen={!!forceLogoutUser}
+        onClose={() => setForceLogoutUser(null)}
+        onConfirm={handleForceLogout}
+        title="強制ログアウト"
+        message={`「${forceLogoutUser?.name}」の全セッションを無効化しますか？次回ログイン時まで利用できなくなります。`}
+        confirmLabel="強制ログアウト"
+        loading={forceLogoutLoading}
+      />
+
+      {/* Login History Modal */}
+      <Modal
+        isOpen={!!loginHistoryUser}
+        onClose={() => setLoginHistoryUser(null)}
+        title={`ログイン履歴 — ${loginHistoryUser?.name}`}
+        size="lg"
+        footer={<Button variant="secondary" onClick={() => setLoginHistoryUser(null)}>閉じる</Button>}
+      >
+        {loginHistoryLoading ? (
+          <div className="space-y-2">
+            {[1,2,3].map(i => <div key={i} className="h-10 bg-white/[0.04] rounded animate-pulse" />)}
+          </div>
+        ) : loginHistory.length === 0 ? (
+          <p className="text-slate-500 text-sm text-center py-8">ログイン履歴がありません</p>
+        ) : (
+          <div className="space-y-1 max-h-96 overflow-y-auto">
+            {loginHistory.map((h) => (
+              <div key={h.id} className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${h.success ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-300">{h.success ? 'ログイン成功' : `失敗: ${h.failReason || '不明'}`}</p>
+                  {h.ipAddress && <p className="text-xs text-slate-600">IP: {h.ipAddress}</p>}
+                </div>
+                <p className="text-xs text-slate-500 flex-shrink-0">
+                  {new Date(h.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
