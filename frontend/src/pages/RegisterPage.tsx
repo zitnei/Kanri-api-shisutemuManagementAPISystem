@@ -55,7 +55,7 @@ export function RegisterPage() {
     <div className="min-h-screen bg-[#0c0c0d] flex">
 
       {/* ── Left panel (brand) ── */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-16 border-r border-white/[0.06]">
+      <div className="hidden lg:flex lg:w-1/2 flex-col p-16 border-r border-white/[0.06]">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="w-7 h-7 bg-[#f4f4f5] rounded-sm flex items-center justify-center">
             <span className="text-[#0c0c0d] text-xs font-bold tracking-tight">K</span>
@@ -63,12 +63,12 @@ export function RegisterPage() {
           <span className="text-sm font-semibold tracking-wide text-[#f4f4f5]">KANRI</span>
         </Link>
 
-        <div>
+        <div className="flex-1 flex flex-col items-center justify-center text-center">
           <blockquote
             className="text-3xl leading-snug tracking-[-0.02em] text-[#f4f4f5] mb-8"
             style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
           >
-            "30日間、無料で<br />
+            "30日間、無料で
             すべての機能を使える。"
           </blockquote>
           <ul className="space-y-3">
