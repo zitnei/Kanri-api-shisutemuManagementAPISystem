@@ -35,14 +35,14 @@ app.use(
 );
 
 // CORS
-app.use(
-  cors({
-    origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()),
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+const corsOptions = {
+  origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.options('*', cors(corsOptions)); // プリフライトリクエストを先に処理
+app.use(cors(corsOptions));
 
 // Compression
 app.use(compression());
