@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
+import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
 import { DepartmentsPage } from './pages/DepartmentsPage';
@@ -29,8 +31,16 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route
+          path="/"
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <HomePage />}
+        />
+        <Route
           path="/login"
           element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+        />
+        <Route
+          path="/register"
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />}
         />
 
         <Route element={<AppLayout />}>

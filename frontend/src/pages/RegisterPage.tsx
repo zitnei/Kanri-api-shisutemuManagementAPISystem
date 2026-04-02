@@ -1,36 +1,50 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
 import { AxiosError } from 'axios';
+import apiClient from '../api/client';
 
-export function LoginPage() {
+export function RegisterPage() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { loginUser } = useAuth();
   const navigate = useNavigate();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
 
-    if (!email.trim() || !password.trim()) {
-      setError('メールアドレスとパスワードを入力してください。');
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      setError('すべての項目を入力してください。');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('パスワードが一致しません。');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('パスワードは8文字以上で入力してください。');
       return;
     }
 
     setLoading(true);
     try {
-      await loginUser(email.trim(), password);
-      navigate('/dashboard', { replace: true });
+      await apiClient.post('/auth/register', {
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      });
+      navigate('/login', { replace: true, state: { registered: true } });
     } catch (err) {
       const axiosErr = err as AxiosError<{ error: { message: string } }>;
       const message =
         axiosErr.response?.data?.error?.message ||
-        'ログインに失敗しました。メールアドレスとパスワードを確認してください。';
+        '登録に失敗しました。しばらく経ってから再度お試しください。';
       setError(message);
     } finally {
       setLoading(false);
@@ -42,7 +56,6 @@ export function LoginPage() {
 
       {/* ── Left panel (brand) ── */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-16 border-r border-white/[0.06]">
-        {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5">
           <div className="w-7 h-7 bg-[#f4f4f5] rounded-sm flex items-center justify-center">
             <span className="text-[#0c0c0d] text-xs font-bold tracking-tight">K</span>
@@ -50,22 +63,29 @@ export function LoginPage() {
           <span className="text-sm font-semibold tracking-wide text-[#f4f4f5]">KANRI</span>
         </Link>
 
-        {/* Brand copy */}
         <div>
           <blockquote
             className="text-3xl leading-snug tracking-[-0.02em] text-[#f4f4f5] mb-8"
             style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
           >
-            "組織のガバナンスを、<br />
-            シンプルに。"
+            "30日間、無料で<br />
+            すべての機能を使える。"
           </blockquote>
-          <p className="text-sm text-[#52525b] leading-relaxed max-w-xs">
-            ユーザー管理、承認フロー、監査ログ。
-            エンタープライズに必要なすべてを一つのプラットフォームで。
-          </p>
+          <ul className="space-y-3">
+            {[
+              'ユーザー管理・ロール設定',
+              '承認フローの構築',
+              '監査ログの自動記録',
+              '部署管理・階層設定',
+            ].map((item) => (
+              <li key={item} className="flex items-center gap-3">
+                <div className="w-1 h-1 rounded-full bg-[#52525b]" />
+                <span className="text-sm text-[#71717a]">{item}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* Footer */}
         <p className="text-xs text-[#3f3f46]">
           &copy; {new Date().getFullYear()} Kanri Management System
         </p>
@@ -87,15 +107,32 @@ export function LoginPage() {
           {/* Heading */}
           <div className="mb-8">
             <h1 className="text-2xl font-semibold text-[#f4f4f5] mb-2 tracking-[-0.02em]">
-              ログイン
+              アカウントを作成
             </h1>
             <p className="text-sm text-[#71717a]">
-              アカウントにログインしてください
+              30日間無料。クレジットカード不要。
             </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Name */}
+            <div>
+              <label className="block text-xs font-medium text-[#a1a1aa] mb-2">
+                お名前
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="山田 太郎"
+                required
+                autoComplete="name"
+                autoFocus
+                className="w-full bg-[#111113] border border-white/[0.08] text-[#f4f4f5] placeholder-[#3f3f46] rounded-sm px-4 py-3 text-sm focus:outline-none focus:border-white/20 transition-colors duration-150"
+              />
+            </div>
+
             {/* Email */}
             <div>
               <label className="block text-xs font-medium text-[#a1a1aa] mb-2">
@@ -105,10 +142,9 @@ export function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@kanri.dev"
+                placeholder="you@company.com"
                 required
                 autoComplete="email"
-                autoFocus
                 className="w-full bg-[#111113] border border-white/[0.08] text-[#f4f4f5] placeholder-[#3f3f46] rounded-sm px-4 py-3 text-sm focus:outline-none focus:border-white/20 transition-colors duration-150"
               />
             </div>
@@ -118,39 +154,36 @@ export function LoginPage() {
               <label className="block text-xs font-medium text-[#a1a1aa] mb-2">
                 パスワード
               </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  autoComplete="current-password"
-                  className="w-full bg-[#111113] border border-white/[0.08] text-[#f4f4f5] placeholder-[#3f3f46] rounded-sm px-4 py-3 pr-10 text-sm focus:outline-none focus:border-white/20 transition-colors duration-150"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#52525b] hover:text-[#a1a1aa] transition-colors"
-                  tabIndex={-1}
-                >
-                  {showPassword ? (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="8文字以上"
+                required
+                autoComplete="new-password"
+                className="w-full bg-[#111113] border border-white/[0.08] text-[#f4f4f5] placeholder-[#3f3f46] rounded-sm px-4 py-3 text-sm focus:outline-none focus:border-white/20 transition-colors duration-150"
+              />
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label className="block text-xs font-medium text-[#a1a1aa] mb-2">
+                パスワード（確認）
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                autoComplete="new-password"
+                className="w-full bg-[#111113] border border-white/[0.08] text-[#f4f4f5] placeholder-[#3f3f46] rounded-sm px-4 py-3 text-sm focus:outline-none focus:border-white/20 transition-colors duration-150"
+              />
             </div>
 
             {/* Error */}
             {error && (
-              <p className="text-xs text-red-400 py-2">{error}</p>
+              <p className="text-xs text-red-400 py-1">{error}</p>
             )}
 
             {/* Submit */}
@@ -159,34 +192,29 @@ export function LoginPage() {
               disabled={loading}
               className="w-full bg-[#f4f4f5] text-[#0c0c0d] rounded-sm py-3 text-sm font-medium hover:bg-white transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed mt-2"
             >
-              {loading ? 'ログイン中...' : 'ログイン'}
+              {loading ? '登録中...' : 'アカウントを作成'}
             </button>
+
+            <p className="text-xs text-[#52525b] text-center leading-relaxed">
+              登録することで、
+              <a href="#" className="underline underline-offset-2">利用規約</a>
+              および
+              <a href="#" className="underline underline-offset-2">プライバシーポリシー</a>
+              に同意したとみなされます。
+            </p>
           </form>
 
-          {/* Register link */}
+          {/* Login link */}
           <div className="mt-6 pt-6 border-t border-white/[0.06]">
             <p className="text-sm text-[#71717a] text-center">
-              アカウントをお持ちでない方は{' '}
+              すでにアカウントをお持ちの方は{' '}
               <Link
-                to="/register"
+                to="/login"
                 className="text-[#f4f4f5] hover:text-white underline underline-offset-4 decoration-white/30 hover:decoration-white/60 transition-all duration-150"
               >
-                新規登録
+                ログイン
               </Link>
             </p>
-          </div>
-
-          {/* Demo credentials */}
-          <div className="mt-6 p-4 border border-white/[0.06] rounded-sm">
-            <p className="text-xs text-[#52525b] mb-2 font-medium">デモアカウント</p>
-            <div className="space-y-1.5">
-              <p className="text-xs text-[#3f3f46]">
-                <span className="text-[#52525b]">管理者</span>　admin@kanri.dev / Admin123!
-              </p>
-              <p className="text-xs text-[#3f3f46]">
-                <span className="text-[#52525b]">マネージャー</span>　manager@kanri.dev / Manager123!
-              </p>
-            </div>
           </div>
         </div>
       </div>
